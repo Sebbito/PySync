@@ -42,8 +42,9 @@ def list_files():
     Return value:
         String which lists all files with path
     '''
-
-    raise 'Not implemented yet'
+    
+    print('Not implemented yet')
+    exit()
 
 
 def add_file(path):
@@ -57,4 +58,5 @@ def add_file(path):
         True if it succeeded, False otherwise
     '''
 
-    raise 'Not implemented yet'
+    print('Not implemented yet')
+    exit()
