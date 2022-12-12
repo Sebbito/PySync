@@ -1,5 +1,6 @@
 #!/bin/python3
 import tqdm
+from pathlib import Path
 import socket as s
 import os
 
@@ -10,6 +11,18 @@ class Sender:
         self.socket = s.socket()
         self.BUFFER_SIZE = 4096
         self.SEPARATOR = "[SEP]"
+
+    def send(self, path):
+        try:
+            p = Path(path)
+            if p.is_file():
+                self.send_file(p.name)
+            else:
+                print("[!] Sending whole dirs is not supportet yet")
+                raise
+        except Exception as e:
+            print(e)
+            raise
 
     def send_file(self, filename):
         filesize = os.path.getsize(filename)
