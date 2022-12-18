@@ -18,12 +18,13 @@ class Sender:
 
     def send(self, mixed):
         '''
-        Scans path and sends all found files through it's dedicated socket.
+        Sends all files in the given Path 'mixed'. Each file is sent through it's own socket.
         '''
         try:
             g = generator.Generator()
             file_list = g.generate_file_list(mixed)
             file_counter = len(file_list)
+
             print(f"[i] Found {file_counter} files.")
             
             print("[i] Connecting to server")
@@ -46,26 +47,15 @@ class Sender:
         for path in file_list:
             p = Path(path)
             # send the file
-            if p.exists():
-                if p.is_file():
-                    # generate a new socket for each file
-                    # closing and reconnecting to prevent merged output
-                    self.socket = s.socket()
-                    self.socket.connect((self.address, self.port))
-                    self.send_file(p)
-                    self.socket.close()
-                # recursion if it is a directory
-                elif p.is_dir():
-                    # count files so we can inform the receiver how many we send
-                    # send files
-                    for file in p.iterdir():
-                        # print(f"[i] Iterating {file} for dir {p}")
-                        self.loop_through_and_send(file)
-                else:
-                    print(f"[!] Path '{p}' is neither file nor directory, aborting.")
-                    exit()
+            if p.exists() and p.is_file:
+                # generate a new socket for each file
+                # closing and reconnecting to prevent merged output
+                self.socket = s.socket()
+                self.socket.connect((self.address, self.port))
+                self.send_file(p)
+                self.socket.close()
             else:
-                print(f"[!] Path '{p}' doesn't exists")
+                print(f"[!] Path '{p}' is not a file or doesn't exists")
                 exit()
 
     def send_file(self, filename):
