@@ -1,19 +1,17 @@
 #!/bin/python3
+import os
 import tqdm
 from pathlib import Path
 import socket as s
-import os
 from generator import Generator
-from time import sleep
+# whenever you see constants, they are from here 🠟
+from constants import *
 
 class Sender:
-    def __init__(self, server_address = "0.0.0.0", server_port = 8008):
+    def __init__(self, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT):
         self.port = server_port
         self.address = server_address
         self.socket = s.socket()
-        self.BUFFER_SIZE = 1024
-        self.SEPARATOR = "[SEP]"
-        self.OK = "[OK]"
 
     def send(self, path):
         '''
@@ -67,14 +65,12 @@ class Sender:
 
     def send_file(self, filename):
         filesize = os.path.getsize(filename)
-        BUFFER_SIZE = self.BUFFER_SIZE
-        SEPARATOR= self.SEPARATOR
 
         # send the filename and filesize
         self.socket.send(f"{filename}{SEPARATOR}{filesize}".encode())
 
-        received = self.socket.recv(self.BUFFER_SIZE).decode()
-        if (received == self.OK):
+        received = self.socket.recv(BUFFER_SIZE).decode()
+        if (received == OK):
             print("[i] Received ok, continuing")
         else:
             print("[!] No ok signal received. Aborting file transmission!")

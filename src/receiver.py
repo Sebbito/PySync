@@ -3,7 +3,8 @@ import os
 import tqdm
 from pathlib import Path
 import socket as s
-# import socketserver as ss
+# whenever you see constants, they are from here 🠟
+from constants import *
 
 class Receiver(object):
     def __init__(self):
@@ -11,9 +12,6 @@ class Receiver(object):
         self.port = 8008
         self.socket = s.socket()
         self.socket.bind((self.address, self.port))
-        self.SEPARATOR = "[SEP]"
-        self.BUFFER_SIZE = 1024
-        self.OK = "[OK]"
 
     def __exit__(self, *args):
         self.socket.close()
@@ -23,7 +21,7 @@ class Receiver(object):
         client_socket, address = self.socket.accept()
         # print(f"Accepted connection {client_socket} with address {address}")
 
-        file_count = client_socket.recv(self.BUFFER_SIZE).decode()
+        file_count = client_socket.recv(BUFFER_SIZE).decode()
         print(f"[i] Receiving {file_count} files")
         for _ in range(int(file_count)):
             self.socket.listen(5)
@@ -39,8 +37,8 @@ class Receiver(object):
     def _receive_file(self, client_socket):
         # receive the file infos
         # receive using client socket, not server socket
-        received = client_socket.recv(self.BUFFER_SIZE).decode()
-        filename, filesize = received.split(self.SEPARATOR)
+        received = client_socket.recv(BUFFER_SIZE).decode()
+        filename, filesize = received.split(SEPARATOR)
 
         filename = Path(filename)
         # convert to integer
@@ -52,7 +50,7 @@ class Receiver(object):
             os.makedirs(filename.parents[0])
 
         # send ok
-        client_socket.send(f"{self.OK}".encode())
+        client_socket.send(f"{OK}".encode())
 
         # start receiving the file from the socket
         # and writing to the file stream
@@ -60,7 +58,7 @@ class Receiver(object):
         with open(filename, "wb") as f:
             while True:
                 # read 1024 bytes from the socket (receive)
-                bytes_read = client_socket.recv(self.BUFFER_SIZE)
+                bytes_read = client_socket.recv(BUFFER_SIZE)
                 if not bytes_read:    
                     # nothing is received
                     # file transmitting is done
