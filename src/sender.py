@@ -3,7 +3,7 @@ import os
 import tqdm
 from pathlib import Path
 import socket as s
-from generator import Generator
+import generator
 # whenever you see constants, they are from here 🠟
 from constants import *
 
@@ -16,13 +16,14 @@ class Sender:
     def __exit__(self, *args):
         self.socket.close()
 
-    def send(self, path):
+    def send(self, mixed):
         '''
         Scans path and sends all found files through it's dedicated socket.
         '''
         try:
-            p = Path(path)
-            file_counter = self.count_files(p)
+            g = generator.Generator()
+            file_list = g.generate_file_list(mixed)
+            file_counter = len(file_list)
             print(f"[i] Found {file_counter} files.")
             
             print("[i] Connecting to server")
@@ -32,7 +33,7 @@ class Sender:
             self.socket.send(f"{file_counter}".encode())
             # close the socket
             self.socket.close()
-            self.loop_through_and_send(p)
+            self.loop_through_and_send(file_list)
 
             # close the socket
             self.socket.close()
@@ -41,30 +42,31 @@ class Sender:
             print(e)
             raise
 
-    def loop_through_and_send(self, path):
-        p = Path(path)
-        # send the file
-        if p.exists():
-            if p.is_file():
-                # generate a new socket for each file
-                # closing and reconnecting to prevent merged output
-                self.socket = s.socket()
-                self.socket.connect((self.address, self.port))
-                self.send_file(p)
-                self.socket.close()
-            # recursion if it is a directory
-            elif p.is_dir():
-                # count files so we can inform the receiver how many we send
-                # send files
-                for file in p.iterdir():
-                    # print(f"[i] Iterating {file} for dir {p}")
-                    self.loop_through_and_send(file)
+    def loop_through_and_send(self, file_list):
+        for path in file_list:
+            p = Path(path)
+            # send the file
+            if p.exists():
+                if p.is_file():
+                    # generate a new socket for each file
+                    # closing and reconnecting to prevent merged output
+                    self.socket = s.socket()
+                    self.socket.connect((self.address, self.port))
+                    self.send_file(p)
+                    self.socket.close()
+                # recursion if it is a directory
+                elif p.is_dir():
+                    # count files so we can inform the receiver how many we send
+                    # send files
+                    for file in p.iterdir():
+                        # print(f"[i] Iterating {file} for dir {p}")
+                        self.loop_through_and_send(file)
+                else:
+                    print(f"[!] Path '{p}' is neither file nor directory, aborting.")
+                    exit()
             else:
-                print(f"[!] Path '{p}' is neither file nor directory, aborting.")
+                print(f"[!] Path '{p}' doesn't exists")
                 exit()
-        else:
-            print(f"[!] Path '{p}' doesn't exists")
-            exit()
 
     def send_file(self, filename):
         filesize = os.path.getsize(filename)
@@ -94,15 +96,3 @@ class Sender:
                 # update the progress bar
                 progress.update(len(bytes_read))
 
-    def count_files(self, path) -> int:
-        ''' Uses recursion to count all files in path. '''
-        counter = 0
-        p = Path(path)
-
-        if p.is_dir():
-            for file in p.iterdir():
-                counter += self.count_files(file)
-        else:
-            counter += 1
-
-        return counter
