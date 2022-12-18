@@ -40,8 +40,8 @@ class Receiver(object):
         received = client_socket.recv(BUFFER_SIZE).decode()
         filename, filesize = received.split(SEPARATOR)
 
+        # type casting
         filename = Path(filename)
-        # convert to integer
         filesize = int(filesize)
 
         # create dirs on the fly
@@ -49,7 +49,7 @@ class Receiver(object):
             print(f"[i] Creating paths '{filename.parents[0]}' for file '{filename}'")
             os.makedirs(filename.parents[0])
 
-        # send ok
+        # send ok since the client will be waiting before proceeding
         client_socket.send(f"{OK}".encode())
 
         # start receiving the file from the socket

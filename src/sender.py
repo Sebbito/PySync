@@ -73,11 +73,12 @@ class Sender:
         self.socket.send(f"{filename}{SEPARATOR}{filesize}".encode())
 
         received = self.socket.recv(BUFFER_SIZE).decode()
-        if (received == OK):
-            print("[i] Received ok, continuing")
-        else:
+
+        if not received == OK:
             print("[!] No ok signal received. Aborting file transmission!")
             exit()
+
+        # print("[i] Received ok, continuing")
 
         progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         with open(filename, "rb") as f:
