@@ -1,6 +1,4 @@
 #!/usr/bin/python3
-import os, sys
-from difflib import *
 from pathlib import Path
 
 READ_BUF = 512
@@ -13,7 +11,7 @@ class Generator(object):
     def generate_file_list(self, mixed):
         ''' Generates a list of files from the mixed object.
             mixed could be a single file or multiple directories
-            We will return all the files as a list of paths '''
+            We will return a list of all files found'''
         
         if mixed == None:
             print("[!] File list is empty. Aborting")
