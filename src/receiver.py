@@ -1,6 +1,7 @@
 #!/bin/python3
 import os
 import tqdm
+from pathlib import Path
 import socket as s
 # import socketserver as ss
 
@@ -12,6 +13,7 @@ class Receiver(object):
         self.socket.bind((self.address, self.port))
         self.SEPARATOR = "[SEP]"
         self.BUFFER_SIZE = 1024
+        self.OK = "[OK]"
 
     def __exit__(self, *args):
         self.socket.close()
@@ -19,7 +21,7 @@ class Receiver(object):
     def receive_all(self):
         self.socket.listen(5)
         client_socket, address = self.socket.accept()
-        print(f"Accepted connection {client_socket} with address {address}")
+        # print(f"Accepted connection {client_socket} with address {address}")
 
         file_count = client_socket.recv(self.BUFFER_SIZE).decode()
         print(f"[i] Receiving {file_count} files")
@@ -35,17 +37,22 @@ class Receiver(object):
 
 
     def _receive_file(self, client_socket):
-        # self.socket.listen(5)
-        # client_socket, address = self.socket.accept()
-
         # receive the file infos
         # receive using client socket, not server socket
         received = client_socket.recv(self.BUFFER_SIZE).decode()
         filename, filesize = received.split(self.SEPARATOR)
-        # remove absolute path if there is
-        filename = os.path.basename(filename)
+
+        filename = Path(filename)
         # convert to integer
         filesize = int(filesize)
+
+        # create dirs on the fly
+        if not os.path.exists(filename.parents[0]):
+            print(f"[i] Creating paths '{filename.parents[0]}' for file '{filename}'")
+            os.makedirs(filename.parents[0])
+
+        # send ok
+        client_socket.send(f"{self.OK}".encode())
 
         # start receiving the file from the socket
         # and writing to the file stream
@@ -63,4 +70,3 @@ class Receiver(object):
                 # update the progress bar
                 progress.update(len(bytes_read))
 
-        # return filename
