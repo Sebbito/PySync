@@ -23,7 +23,7 @@ group.add_argument('--send', dest='path', help='Sends files for the given direct
 args = parser.parse_args()
 print(args)
 
-if args.listen:
+if args.receive:
     r = Receiver()
     r.receive_all()
 if args.path:
