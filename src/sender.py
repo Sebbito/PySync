@@ -13,6 +13,9 @@ class Sender:
         self.address = server_address
         self.socket = s.socket()
 
+    def __exit__(self, *args):
+        self.socket.close()
+
     def send(self, path):
         '''
         Scans path and sends all found files through it's dedicated socket.
