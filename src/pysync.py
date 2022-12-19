@@ -16,7 +16,7 @@ def receive(args):
         r = receiver.Receiver()
 
     if args.once == True:
-        r.receive_all()
+        r.receive_once()
     elif args.continuos == True:
         r.receive_forever()
     else:
@@ -25,7 +25,7 @@ def receive(args):
     exit(EXIT_SUCCESS)
 
 def send(args):
-    s = sender.Sender()
+    s = sender.Sender(update=args.update)
     if args.file:
         s.send(args.file)
     exit(EXIT_SUCCESS)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # Sending
     parser_send = subparsers.add_parser('send', aliases=['s'], help='Sends files from the given directory to the server.')
     parser_send.add_argument('file', nargs='+', help='Files to be sent.')
-    # parser_send.add_argument('-u', '--update', action='store_true', help='Only update files.')
+    parser_send.add_argument('-u', '--update', action='store_true', help='Update local files if server has newer changes.')
     parser_send.set_defaults(func=send)
 
     # Receiving 
