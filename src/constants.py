@@ -10,6 +10,7 @@ DEFAULT_DESTINATION = './'
 SEPARATOR = "[SEP]"
 OK = "[OK]"
 SKIP = "[SKIP]"
+UPDATE = "[UPDATE]"
 
 # exit codes
 EXIT_SUCCESS = 0
