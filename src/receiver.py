@@ -105,6 +105,7 @@ def receive_msg_start(socket):
     client_socket, address = socket.accept()
 
     received = client_socket.recv(BUFFER_SIZE).decode()
+    client_socket.send(f"{OK}".encode())
     client_socket.close()
 
     return received.split(SEPARATOR)

@@ -12,7 +12,7 @@ class Sender:
     def __init__(self, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT, update = False):
         self.port = server_port
         self.address = server_address
-        self.socket = s.socket()
+        self.socket = None
         self.update = update
 
     def __exit__(self, *args):
@@ -24,21 +24,11 @@ class Sender:
         '''
         try:
             file_list = gen.generate_file_list(mixed)
-            file_counter = len(file_list)
+            file_count = len(file_list)
 
-            print(f"[i] Found {file_counter} files.")
+            print(f"[i] Found {file_count} files.")
             
-            try:
-                print("[i] Connecting to server.")
-                self.socket.connect((self.address, self.port))
-                print("[+] Connected to server.")
-            except Exception as e:
-                print("[!] Server not found.")
-                raise e
-
-            self.socket.send(f"{file_counter}{SEPARATOR}{self.update}".encode())
-            # close the socket
-            self.socket.close()
+            initiate_communication(address=self.address, port=self.port, update=self.update, file_count=file_count)
 
             # send all the files in the file list
             self.loop_through_and_send(file_list)
@@ -63,6 +53,33 @@ class Sender:
             else:
                 print(f"[!] Path '{p}' is not a file or doesn't exists")
                 exit()
+
+def initiate_communication(address, port, update=False, file_count=0, intention='send'):
+    if intention == 'send':
+        try:
+            socket = s.socket()
+            print(f"[i] Connecting to server {address}:{port}.")
+            socket.connect((address, port))
+            print("[+] Connected to server.")
+
+            socket.send(f"{file_count}{SEPARATOR}{update}".encode())
+
+            rec = socket.recv(BUFFER_SIZE).decode()
+
+            if not rec == OK:
+                print(f"[!] Invalid server response '{rec}'. Aborting")
+                exit(EXIT_FAILURE)
+
+            print(f"[i] Received ok. Start sending files.")
+            # close the socket
+            socket.close()
+        except Exception as e:
+            print("[!] Server not found.")
+            raise e
+
+    else:
+        print(f"[!] Invalid intention. Aborting")
+        exit(EXIT_FAILURE)
     
 def send_file(socket, file):
     # prepare first info pack
