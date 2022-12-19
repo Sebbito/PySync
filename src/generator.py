@@ -1,17 +1,11 @@
 #!/usr/bin/python3
+import hashlib
 from pathlib import Path
 
-READ_BUF = 512
-
-# class Generator(object):
-    # def __init__(self):
-
-    # def __exit__(self, *args):
-
 def generate_file_list(mixed):
-    ''' Generates a list of files from the mixed object.
+    ''' Generates a list of path objects from the mixed object.
         mixed could be a single file or multiple directories
-        We will return a list of all files found'''
+        Will return a list of all files found'''
     
     if mixed == None:
         print("[!] File list is empty. Aborting")
@@ -41,3 +35,10 @@ def fetch_files(path, list):
         print("[!] Path {p} is not viable. Aborting")
         exit(EXIT_FAILURE)
 
+def calculate_md5(file):
+    ''' Calculates the md5 sum for the file. '''
+    hash_md5 = hashlib.md5()
+    with open(file, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
