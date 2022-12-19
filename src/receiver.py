@@ -16,6 +16,11 @@ class Receiver(object):
     def __exit__(self, *args):
         self.socket.close()
 
+    def receive_forever(self):
+        while(True):
+            self.receive_all()
+
+
     def receive_all(self):
         self.socket.listen(5)
         client_socket, address = self.socket.accept()
@@ -26,15 +31,15 @@ class Receiver(object):
         for _ in range(int(file_count)):
             self.socket.listen(5)
             client_socket, address = self.socket.accept()
-            self._receive_file(client_socket)
+            self.receive_file(client_socket)
 
         # close the client socket
         client_socket.close()
         # close the server socket
-        self.socket.close()
+        # self.socket.close()
 
 
-    def _receive_file(self, client_socket):
+    def receive_file(self, client_socket):
         # receive the file infos
         # receive using client socket, not server socket
         received = client_socket.recv(BUFFER_SIZE).decode()
