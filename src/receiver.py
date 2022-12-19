@@ -29,6 +29,8 @@ class Receiver(object):
 
         file_count = client_socket.recv(BUFFER_SIZE).decode()
         print(f"[i] Receiving {file_count} files")
+        client_socket.close()
+
         for _ in range(int(file_count)):
             self.socket.listen(5)
             client_socket, address = self.socket.accept()
