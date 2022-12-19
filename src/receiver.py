@@ -8,11 +8,12 @@ import generator as gen
 from constants import *
 
 class Receiver(object):
-    def __init__(self):
-        self.address = "0.0.0.0"
-        self.port = 8008
+    def __init__(self, destination = DEFAULT_DESTINATION, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT):
+        self.address = server_address
+        self.port = server_port
         self.socket = s.socket(s.AF_INET, s.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
+        self.destination = destination
 
     def __exit__(self, *args):
         self.socket.close()
@@ -45,7 +46,7 @@ class Receiver(object):
         filename, filesize, md5 = received.split(SEPARATOR)
 
         # type casting
-        filename = Path(filename)
+        filename = Path(self.destination + '/' + filename)
         filesize = int(filesize)
 
         # parent dirs don't exist (so the file doesn't exist aswell)
