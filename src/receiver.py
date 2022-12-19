@@ -50,7 +50,7 @@ class Receiver:
 
     def handle_server_response(self, socket, update_flag):
         ''' Currently does like a two in one where it handles all the args and also the response. '''
-        filename, filesize, md5, modtime = receive_file_info(socket, self.destination)
+        filename, filesize, md5, modtime = receive_file_info(socket)
 
         # type casting
         filepath = Path(self.destination + '/' + filename)
@@ -113,7 +113,7 @@ def receive_msg_start(socket):
 
 def receive_file(socket, destination=None):
     ''' Receives and stores the file, no questions asked. '''
-    filename, filesize, md5, modtime = receive_file_info(socket, destination)
+    filename, filesize, md5, modtime = receive_file_info(socket)
 
     if not destination == None:
         filename = Path(destination + '/' + filename)
@@ -124,7 +124,7 @@ def receive_file(socket, destination=None):
     receive_file_contents(socket, path, filesize)
 
 
-def receive_file_info(socket, destination):
+def receive_file_info(socket):
     ''' Function to receive the file informations.'''
     # receive the file infos
     received = socket.recv(BUFFER_SIZE).decode()
