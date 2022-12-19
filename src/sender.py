@@ -3,7 +3,7 @@ import os
 import tqdm
 from pathlib import Path
 import socket as s
-import generator
+import generator as g
 # whenever you see constants, they are from here 🠟
 from constants import *
 
@@ -21,7 +21,6 @@ class Sender:
         Sends all files in the given Path 'mixed'. Each file is sent through it's own socket.
         '''
         try:
-            g = generator.Generator()
             file_list = g.generate_file_list(mixed)
             file_counter = len(file_list)
 
