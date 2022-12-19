@@ -4,14 +4,16 @@ import tqdm
 from pathlib import Path
 import socket as s
 import generator as gen
-# whenever you see constants, they are from here 🠟
+import receiver 
+# whenever you see constants, they are from here
 from constants import *
 
 class Sender:
-    def __init__(self, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT):
+    def __init__(self, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT, update = False):
         self.port = server_port
         self.address = server_address
         self.socket = s.socket()
+        self.update = update
 
     def __exit__(self, *args):
         self.socket.close()
@@ -26,66 +28,80 @@ class Sender:
 
             print(f"[i] Found {file_counter} files.")
             
-            print("[i] Connecting to server")
-            self.socket.connect((self.address, self.port))
-            print("[+] Connected to server")
+            try:
+                print("[i] Connecting to server.")
+                self.socket.connect((self.address, self.port))
+                print("[+] Connected to server.")
+            except Exception as e:
+                print("[!] Server not found.")
+                raise e
 
-            self.socket.send(f"{file_counter}".encode())
+            self.socket.send(f"{file_counter}{SEPARATOR}{self.update}".encode())
             # close the socket
             self.socket.close()
+
+            # send all the files in the file list
             self.loop_through_and_send(file_list)
 
-            # close the socket
-            self.socket.close()
             print("[+] Closed socket")
         except Exception as e:
             print(e)
             raise
 
     def loop_through_and_send(self, file_list):
-        for p in file_list:
+        for path in file_list:
             # send the file
-            if p.exists() and p.is_file:
+            if path.exists() and path.is_file:
                 # generate a new socket for each file
                 # closing and reconnecting to prevent merged output
                 self.socket = s.socket()
                 self.socket.connect((self.address, self.port))
-                self.send_file(p)
+                
+                send_file(self.socket, path)
+                
                 self.socket.close()
             else:
                 print(f"[!] Path '{p}' is not a file or doesn't exists")
                 exit()
+    
+def send_file(socket, file):
+    # prepare first info pack
+    filesize = os.path.getsize(file)
+    md5 = gen.calculate_md5(file)
+    modtime = os.stat(file).st_mtime
 
-    def send_file(self, filename):
-        filesize = os.path.getsize(filename)
-        md5 = gen.calculate_md5(filename)
+    # send the filename and filesize
+    socket.send(f"{file}{SEPARATOR}{filesize}{SEPARATOR}{md5}{SEPARATOR}{modtime}".encode())
 
-        # send the filename and filesize
-        self.socket.send(f"{filename}{SEPARATOR}{filesize}{SEPARATOR}{md5}".encode())
+    # receive server response
+    received = socket.recv(BUFFER_SIZE).decode()
 
-        received = self.socket.recv(BUFFER_SIZE).decode()
+    if received == OK:
+        print("[+] Received ok, continuing.")
+        send_file_contents(socket, file)
+    elif received == SKIP:
+        print("[i] Received skip, file contents are the same, continuing.")
+    elif received == UPDATE:
+        print("[i] Received update, server has newer files, continuing.")
+        socket.send(f"{OK}".encode())
+        receiver.receive_file(socket)
+    else:
+        print("[!] No status signal received. Aborting file transmission!")
+        exit()
 
-        if received == OK:
-            print("[+] Received ok, continuing.")
-        elif received == SKIP:
-            print("[i] Received skip, file contents are the same, continuing.")
-            return EXIT_SUCCESS
-        else:
-            print("[!] No status signal received. Aborting file transmission!")
-            exit()
+def send_file_contents(socket, filename):
+    filesize = os.path.getsize(filename)
 
-        # print("[i] Received ok, continuing")
-
-        progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        with open(filename, "rb") as f:
-            while True:
-                # read the bytes from the file
-                bytes_read = f.read(BUFFER_SIZE)
-                if not bytes_read:
-                    # file transmitting is done
-                    break
-                # we use sendall to assure transimission in busy networks
-                self.socket.sendall(bytes_read)
-                # update the progress bar
-                progress.update(len(bytes_read))
+    progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+    with open(filename, "rb") as f:
+        while True:
+            # read the bytes from the file
+            bytes_read = f.read(BUFFER_SIZE)
+            if not bytes_read:
+                # file transmitting is done
+                break
+            # we use sendall to assure transimission in busy networks
+            socket.sendall(bytes_read)
+            # update the progress bar
+            progress.update(len(bytes_read))
 
