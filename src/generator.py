@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import hashlib
 from pathlib import Path
+from constants import *
 
 def generate_file_list(mixed):
     ''' Generates a list of path objects from the mixed object.
