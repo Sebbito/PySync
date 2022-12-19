@@ -3,14 +3,15 @@ import os
 import tqdm
 from pathlib import Path
 import socket as s
-# whenever you see constants, they are from here 🠟
+import generator as gen
+# whenever you see constants, they are from here
 from constants import *
 
 class Receiver(object):
     def __init__(self):
         self.address = "0.0.0.0"
         self.port = 8008
-        self.socket = s.socket()
+        self.socket = s.socket(s.AF_INET, s.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
 
     def __exit__(self, *args):
@@ -32,27 +33,31 @@ class Receiver(object):
             self.socket.listen(5)
             client_socket, address = self.socket.accept()
             self.receive_file(client_socket)
-
-        # close the client socket
-        client_socket.close()
-        # close the server socket
-        # self.socket.close()
+            client_socket.close()
 
 
     def receive_file(self, client_socket):
         # receive the file infos
         # receive using client socket, not server socket
         received = client_socket.recv(BUFFER_SIZE).decode()
-        filename, filesize = received.split(SEPARATOR)
+        filename, filesize, md5 = received.split(SEPARATOR)
 
         # type casting
         filename = Path(filename)
         filesize = int(filesize)
 
-        # create dirs on the fly
+        # parent dirs don't exist (so the file doesn't exist aswell)
         if not os.path.exists(filename.parents[0]):
             print(f"[i] Creating paths '{filename.parents[0]}' for file '{filename}'")
             os.makedirs(filename.parents[0])
+        elif filename.exists():
+            # file exists. Is it the same?
+            if gen.calculate_md5(filename) == md5:
+                # skip transmition since they are the same
+                client_socket.send(f"{SKIP}".encode())
+                print(f"[i] Checksums are the same, skipping transmition of file {filename}.")
+                return EXIT_SUCCESS
+
 
         # send ok since the client will be waiting before proceeding
         client_socket.send(f"{OK}".encode())

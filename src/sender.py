@@ -3,7 +3,7 @@ import os
 import tqdm
 from pathlib import Path
 import socket as s
-import generator as g
+import generator as gen
 # whenever you see constants, they are from here 🠟
 from constants import *
 
@@ -21,7 +21,7 @@ class Sender:
         Sends all files in the given Path 'mixed'. Each file is sent through it's own socket.
         '''
         try:
-            file_list = g.generate_file_list(mixed)
+            file_list = gen.generate_file_list(mixed)
             file_counter = len(file_list)
 
             print(f"[i] Found {file_counter} files.")
@@ -43,8 +43,7 @@ class Sender:
             raise
 
     def loop_through_and_send(self, file_list):
-        for path in file_list:
-            p = Path(path)
+        for p in file_list:
             # send the file
             if p.exists() and p.is_file:
                 # generate a new socket for each file
@@ -59,14 +58,20 @@ class Sender:
 
     def send_file(self, filename):
         filesize = os.path.getsize(filename)
+        md5 = gen.calculate_md5(filename)
 
         # send the filename and filesize
-        self.socket.send(f"{filename}{SEPARATOR}{filesize}".encode())
+        self.socket.send(f"{filename}{SEPARATOR}{filesize}{SEPARATOR}{md5}".encode())
 
         received = self.socket.recv(BUFFER_SIZE).decode()
 
-        if not received == OK:
-            print("[!] No ok signal received. Aborting file transmission!")
+        if received == OK:
+            print("[+] Received ok, continuing.")
+        elif received == SKIP:
+            print("[i] Received skip, file contents are the same, continuing.")
+            return EXIT_SUCCESS
+        else:
+            print("[!] No status signal received. Aborting file transmission!")
             exit()
 
         # print("[i] Received ok, continuing")
@@ -79,8 +84,7 @@ class Sender:
                 if not bytes_read:
                     # file transmitting is done
                     break
-                # we use sendall to assure transimission in 
-                # busy networks
+                # we use sendall to assure transimission in busy networks
                 self.socket.sendall(bytes_read)
                 # update the progress bar
                 progress.update(len(bytes_read))
