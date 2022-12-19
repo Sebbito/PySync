@@ -17,6 +17,7 @@ def receive(args):
         r.receive_forever()
     else:
         print("Whoops! Could not parse that argument. Please try again with a different argument.")
+        exit(EXIT_FAILURE)
     exit(EXIT_SUCCESS)
 
 parser = ap.ArgumentParser(
