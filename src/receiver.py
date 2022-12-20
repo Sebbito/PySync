@@ -18,6 +18,7 @@ class Receiver:
         self.port = server_port
         self.socket = s.socket(s.AF_INET, s.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
+        self.socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
         self.destination = destination
         atexit.register(self.exit)
 
@@ -39,6 +40,7 @@ class Receiver:
     def receive(self):
         file_count, update_flag = receive_msg_start(self.socket)
         print(f"[i] Receiving {file_count} files. Updates: {update_flag}")
+        update_flag = update_flag == 'True'
 
         for _ in range(int(file_count)):
             self.socket.listen(5)
@@ -75,9 +77,10 @@ class Receiver:
             # not the same means updating
             # if our file is newer and client wants to update
             if (os.stat(filename).st_mtime > float(modtime)):
-                if update_flag:
+                if update_flag == True:
                     # client wants to receive the updated file contents
                     # inform him of the update
+                    print(f"[i] Sending updated file {filepath}")
                     socket.send(f"{UPDATE}".encode())
                     received = socket.recv(BUFFER_SIZE).decode()
                     if received == OK:
@@ -87,7 +90,9 @@ class Receiver:
                         exit(EXIT_FAILURE)
                     return EXIT_SUCCESS
                 else:
-                    print(f"[i] Sending updated file {filepath}")
+                    socket.send(f"{SKIP}".encode())
+                    print(f"[i] Update_flag is {update_flag}. Skipping transmition.")
+                    return EXIT_SUCCESS
             else:
                 print(f"[i] Getting newer client changes")
                 socket.send(f"{OK}".encode())
