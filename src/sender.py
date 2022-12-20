@@ -35,8 +35,9 @@ def send(args):
 
         print("[+] Closed socket")
     except Exception as e:
-        print(e)
-        raise
+        print(f"[!] Fatal error while transmitting. Aborting.")
+        exit(EXIT_FAILURE)
+        # raise
 
 
 def initiate_communication(address, port, args):
@@ -59,7 +60,7 @@ def initiate_communication(address, port, args):
         # close the socket
         socket.close()
     except Exception as e:
-        print("[!] Server not found.")
+        print("[!] Server not found or connection closed.")
         raise e
 
 def loop_through_and_send(address, port, file_list):
