@@ -11,6 +11,7 @@ from constants import *
 
 def receive_forever(args):
     socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+    socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
     socket.bind((DEFAULT_SERVER, DEFAULT_PORT))
 
     try:
@@ -21,9 +22,10 @@ def receive_forever(args):
         print(f"[!] Aborted receiving")
     
 
-def receive_once(args):
+def receive_once(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
     socket = s.socket(s.AF_INET, s.SOCK_STREAM)
-    socket.bind((DEFAULT_SERVER, DEFAULT_PORT))
+    socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
+    socket.bind((address, port))
 
     try:
         receive(socket)
@@ -32,14 +34,24 @@ def receive_once(args):
         print(f"[!] Aborted receiving")
 
 def receive(socket):
-    args = receive_msg_start(socket)
+    args, address = receive_msg_start(socket)
 
     # start according routine
     if args['func'] == 'send':
         receive_files(socket, args)
     elif args['func'] == 'get':
-        print('')
-        # sender.send(args)
+        try:
+            list, count = gen.get_file_list_and_count(args['file'])
+            # send filecount 
+            sender.send_file_count(address, DEFAULT_PORT, count)
+
+            # send all the files in the file list
+            sender.loop_through_and_send(address, DEFAULT_PORT, list)
+
+            print("[+] Closed socket")
+        except:
+            print(f"[!] Fatal error while transmitting. Aborting.")
+        raise
     # elif args['func'] is 'sync':
     #     receive_files(args, socket)
     #     sender.send(args)
@@ -65,7 +77,7 @@ def receive_msg_start(socket):
         client_socket.close()
         print("[i] Closing socket")
 
-    return received
+    return received, address
 
 def receive_files(socket: s.socket, args: dict):
     file_count = receive_file_count(socket)

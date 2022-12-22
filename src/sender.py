@@ -9,32 +9,37 @@ import receiver
 from constants import *
 
 def get(args):
-    exit('not implemented')
+    # send the first message of the communication
+    initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
+
+    receiver.receive_once(args)
 
 def sync(args):
     exit('not implemented')
 
-def send(args):
+def send(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
     '''
     Function to send one or more files to a server.
     args:
         - file
         - options for operation
     '''
+    if hasattr(args, 'func'):
+        # remove the file list
+        args.pop('file')
+
     try:
         list, count = gen.get_file_list_and_count(args['file'])
 
         # send the first message of the communication
-        initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
+        initiate_communication(address, port, args)
 
         # send filecount 
-        send_file_count(DEFAULT_SERVER, DEFAULT_PORT, count)
+        send_file_count(address, port, count)
 
         # send all the files in the file list
-        loop_through_and_send(DEFAULT_SERVER, DEFAULT_PORT, list)
-
-        print("[+] Closed socket")
-    except Exception:
+        loop_through_and_send(address, port, list)
+    except:
         print(f"[!] Fatal error while transmitting. Aborting.")
         raise
 
@@ -42,8 +47,6 @@ def send(args):
 def initiate_communication(address, port, args):
     ''' Sends the arguments over to the server to set it up for transmition. '''
     try:
-        # remove the file list
-        args.pop('file')
 
         socket = s.socket()
         print(f"[i] Connecting to server {DEFAULT_SERVER}:{DEFAULT_PORT}.")
