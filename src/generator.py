@@ -19,6 +19,14 @@ def generate_file_list(mixed):
 
     return file_list
 
+def get_file_list_and_count(files):
+    file_list = generate_file_list(files)
+    file_count = len(file_list)
+
+    print(f"[i] Found {file_count} files.")
+    return file_list, file_count
+
+
 def fetch_files(path, list):
     ''' Uses recursion to add all files in path to the list.'''
 

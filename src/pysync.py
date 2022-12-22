@@ -1,8 +1,8 @@
 #!/bin/python3
 # This file implements functions and ressources for the client side of pysync
 import argparse as ap
-import receiver
-import sender 
+import receiver as r
+import sender as s
 from constants import *
 
 VERSION="0.0.1"
@@ -10,15 +10,11 @@ VERSION="0.0.1"
 # CONF_PATH = "~/.config/pysync/client"
 
 def receive(args):
-    if args.destination:
-        r = receiver.Receiver(destination = args.destination)
-    else:
-        r = receiver.Receiver()
 
-    if args.once == True:
-        r.receive_once()
-    elif args.continuos == True:
-        r.receive_forever()
+    if args['once'] == True:
+        r.receive_once(args)
+    elif args['continuos'] == True:
+        r.receive_forever(args)
     else:
         print("Whoops! Could not parse that argument. Please try again with a different argument.")
         exit(EXIT_FAILURE)
@@ -26,17 +22,17 @@ def receive(args):
 
 def send(args):
     # s = sender.Sender(update=args.update)
-    sender.send(args)
+    s.send(args)
     exit(EXIT_SUCCESS)
 
 def get(args):
     # s = sender.Sender(update=args.update)
-    sender.get(args)
+    s.get(args)
     exit(EXIT_SUCCESS)
 
 def sync(args):
     # s = sender.Sender(update=args.update)
-    sender.sync(args)
+    s.sync(args)
     exit(EXIT_SUCCESS)
 
 if __name__ == "__main__":
@@ -77,7 +73,6 @@ if __name__ == "__main__":
     parser_receive.set_defaults(func=receive)
 
     args = parser.parse_args()
-    print(f"Args: {args}")
 
     if hasattr(args, "func"):
         func = args.func
