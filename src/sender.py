@@ -8,78 +8,106 @@ import receiver
 # whenever you see constants, they are from here
 from constants import *
 
-class Sender:
-    def __init__(self, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT, update = False):
-        self.port = server_port
-        self.address = server_address
-        self.socket = None
-        self.update = update
+def get(args):
+    exit('not implemented')
 
-    def __exit__(self, *args):
-        self.socket.close()
+def sync(args):
+    exit('not implemented')
 
-    def send(self, mixed):
-        '''
-        Sends all files in the given Path 'mixed'. Each file is sent through it's own socket.
-        '''
-        try:
-            file_list = gen.generate_file_list(mixed)
-            file_count = len(file_list)
+def send(args):
+    '''
+    Function to send one or more files to a server.
+    args:
+        - file
+        - options for operation
+    '''
+    try:
+        list, count = gen.get_file_list_and_count(args['file'])
 
-            print(f"[i] Found {file_count} files.")
-            
-            initiate_communication(address=self.address, port=self.port, update=self.update, file_count=file_count)
+        # send the first message of the communication
+        initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
 
-            # send all the files in the file list
-            self.loop_through_and_send(file_list)
+        # send filecount 
+        send_file_count(DEFAULT_SERVER, DEFAULT_PORT, count)
 
-            print("[+] Closed socket")
-        except Exception as e:
-            print(e)
-            raise
+        # send all the files in the file list
+        loop_through_and_send(DEFAULT_SERVER, DEFAULT_PORT, list)
 
-    def loop_through_and_send(self, file_list):
-        for path in file_list:
-            # send the file
-            if path.exists() and path.is_file:
-                # generate a new socket for each file
-                # closing and reconnecting to prevent merged output
-                self.socket = s.socket()
-                self.socket.connect((self.address, self.port))
-                
-                send_file(self.socket, path)
-                
-                self.socket.close()
-            else:
-                print(f"[!] Path '{p}' is not a file or doesn't exists")
-                exit()
+        print("[+] Closed socket")
+    except Exception:
+        print(f"[!] Fatal error while transmitting. Aborting.")
+        raise
 
-def initiate_communication(address, port, update=False, file_count=0, intention='send'):
-    if intention == 'send':
-        try:
+
+def initiate_communication(address, port, args):
+    ''' Sends the arguments over to the server to set it up for transmition. '''
+    try:
+        # remove the file list
+        args.pop('file')
+
+        socket = s.socket()
+        print(f"[i] Connecting to server {DEFAULT_SERVER}:{DEFAULT_PORT}.")
+        socket.connect((address, port))
+        print("[+] Connected to server.")
+        socket.send(f"{args}".encode())
+
+        rec = socket.recv(BUFFER_SIZE).decode()
+
+        if not rec == OK:
+            print(f"[!] Invalid server response '{rec}'. Aborting")
+            exit(EXIT_FAILURE)
+
+        print(f"[i] Received ok")
+        # close the socket
+        socket.close()
+    except ConnectionRefusedError:
+        print("[!] Server not found or connection closed.")
+        exit(EXIT_FAILURE)
+
+
+def send_file_count(address, port, file_count):
+    if file_count is None:
+        print(f"[!] File list empty. Aborting")
+        exit(EXIT_FAILURE)
+
+    socket = s.socket()
+    socket.connect((address, port))
+    
+    print(f"[i] Sending filecount")
+    socket.send(f"{file_count}".encode())
+
+    rec = socket.recv(BUFFER_SIZE).decode()
+
+    if not rec == OK:
+        print(f"[!] Invalid server response '{rec}'. Aborting")
+        exit(EXIT_FAILURE)
+
+    print(f"[i] Received ok")
+
+
+def loop_through_and_send(address, port, file_list):
+    ''' Opens sockets for each file and sends the file contents to the server. '''
+
+    if file_list is None:
+        print("[!] Empty file list. Aborting")
+
+    print("[i] Start sending files")
+    for path in file_list:
+        # send the file
+        if path.exists() and path.is_file:
+            # generate a new socket for each file
+            # closing and reconnecting to prevent merged output
             socket = s.socket()
-            print(f"[i] Connecting to server {address}:{port}.")
             socket.connect((address, port))
-            print("[+] Connected to server.")
 
-            socket.send(f"{file_count}{SEPARATOR}{update}".encode())
-
-            rec = socket.recv(BUFFER_SIZE).decode()
-
-            if not rec == OK:
-                print(f"[!] Invalid server response '{rec}'. Aborting")
-                exit(EXIT_FAILURE)
-
-            print(f"[i] Received ok. Start sending files.")
+            send_file(socket, path)
+            
             # close the socket
             socket.close()
-        except Exception as e:
-            print("[!] Server not found.")
-            raise e
+        else:
+            print(f"[!] Path '{path}' is not a file or doesn't exists")
+            exit()
 
-    else:
-        print(f"[!] Invalid intention. Aborting")
-        exit(EXIT_FAILURE)
     
 def send_file(socket, file):
     # prepare first info pack
@@ -97,14 +125,11 @@ def send_file(socket, file):
         print("[+] Received ok, continuing.")
         send_file_contents(socket, file)
     elif received == SKIP:
-        print("[i] Received skip, file contents are the same, continuing.")
-    elif received == UPDATE:
-        print("[i] Received update, server has newer files, continuing.")
-        socket.send(f"{OK}".encode())
-        receiver.receive_file(socket)
+        print("[i] Received skip, continuing")
     else:
-        print("[!] No status signal received. Aborting file transmission!")
-        exit()
+        print("[!] No or illegal status signal received. Aborting file transmission")
+        exit(EXIT_FAILURE)
+
 
 def send_file_contents(socket, filename):
     filesize = os.path.getsize(filename)
