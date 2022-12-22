@@ -7,136 +7,155 @@ import generator as gen
 import sender
 # whenever you see constants, they are from here
 from constants import *
-import atexit
 
 
-class Receiver:
-    ''' Server like class for receiving files. '''
+def receive_forever(args):
+    socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+    socket.bind((DEFAULT_SERVER, DEFAULT_PORT))
 
-    def __init__(self, destination = DEFAULT_DESTINATION, server_address = DEFAULT_SERVER, server_port = DEFAULT_PORT):
-        self.address = server_address
-        self.port = server_port
-        self.socket = s.socket(s.AF_INET, s.SOCK_STREAM)
-        self.socket.bind((self.address, self.port))
-        self.socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
-        self.destination = destination
-        atexit.register(self.exit)
-
-    def __exit__(self, *args):
-        self.socket.close()
-
-    def exit(self):
-        self.socket.close()
-
-    def receive_forever(self):
+    try:
         while(True):
-            self.receive()
-        self.socket.close()
+            receive(socket)
+    except KeyboardInterrupt:
+        socket.close()
+        print(f"[!] Aborted receiving")
+    
 
-    def receive_once(self):
-        self.receive()
-        self.socket.close()
+def receive_once(args):
+    socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+    socket.bind((DEFAULT_SERVER, DEFAULT_PORT))
 
-    def receive(self):
-        file_count, update_flag = receive_msg_start(self.socket)
-        print(f"[i] Receiving {file_count} files. Updates: {update_flag}")
-        update_flag = update_flag == 'True'
+    try:
+        receive(socket)
+    except KeyboardInterrupt:
+        socket.close()
+        print(f"[!] Aborted receiving")
 
-        for _ in range(int(file_count)):
-            self.socket.listen(5)
-            client_socket, address = self.socket.accept()
+def receive(socket):
+    args = receive_msg_start(socket)
 
-            self.handle_server_response(client_socket, update_flag)
-            
-            client_socket.close()
-
-    def handle_server_response(self, socket, update_flag):
-        ''' Currently does like a two in one where it handles all the args and also the response. '''
-        filename, filesize, md5, modtime = receive_file_info(socket)
-
-        # type casting
-        filepath = Path(self.destination + '/' + filename)
-        filesize = int(filesize)
-
-        # create dirs if file didn't exists
-        if not filepath.exists():
-            if not filepath.parents[0].exists():
-                os.makedirs(filepath.parents[0])
-
-            # send ok since the client will be waiting before proceeding
-            socket.send(f"{OK}".encode())
-            receive_file_contents(socket, filepath, filesize)
-            return EXIT_SUCCESS
-
-        if gen.calculate_md5(filepath) == md5:
-            # skip transmition since they are the same
-            socket.send(f"{SKIP}".encode())
-            print(f"[i] Checksums are the same, skipping transmition of file {filepath}.")
-            return EXIT_SUCCESS
-        else:
-            # not the same means updating
-            # if our file is newer and client wants to update
-            if (os.stat(filename).st_mtime > float(modtime)):
-                if update_flag == True:
-                    # client wants to receive the updated file contents
-                    # inform him of the update
-                    print(f"[i] Sending updated file {filepath}")
-                    socket.send(f"{UPDATE}".encode())
-                    received = socket.recv(BUFFER_SIZE).decode()
-                    if received == OK:
-                        sender.send_file(socket, filepath)
-                    else:
-                        print(f"[!] Expected {OK}, received {received} instead. Aborting")
-                        exit(EXIT_FAILURE)
-                    return EXIT_SUCCESS
-                else:
-                    socket.send(f"{SKIP}".encode())
-                    print(f"[i] Update_flag is {update_flag}. Skipping transmition.")
-                    return EXIT_SUCCESS
-            else:
-                print(f"[i] Getting newer client changes")
-                socket.send(f"{OK}".encode())
-                receive_file_contents(socket, filepath, filesize)
-                return EXIT_SUCCESS
-
-        print("[!] Reached end of handle function. Illegal state. Aborting")
+    # start according routine
+    if args['func'] == 'send':
+        receive_files(socket, args)
+    elif args['func'] == 'get':
+        print('')
+        # sender.send(args)
+    # elif args['func'] is 'sync':
+    #     receive_files(args, socket)
+    #     sender.send(args)
+    else:
+        print(f"[!] Illegal option {args['func']}. Aborting")
         exit(EXIT_FAILURE)
 
-    # end class Receiver
 
 def receive_msg_start(socket):
     ''' Function to receive the starting information of the transmition.'''
     socket.listen(5)
     client_socket, address = socket.accept()
 
-    received = client_socket.recv(BUFFER_SIZE).decode()
-    client_socket.send(f"{OK}".encode())
-    client_socket.close()
+    try:
+        received = eval(client_socket.recv(BUFFER_SIZE).decode())
+        print(f"[i] Received {received}")
+        client_socket.send(f"{OK}".encode())
+        print("[i] Sending ok")
+    except SyntaxError:
+        print(f"[!] Could not parse received message. Aborting")
+        exit(EXIT_FAILURE)
+    finally:
+        client_socket.close()
+        print("[i] Closing socket")
 
-    return received.split(SEPARATOR)
+    return received
+
+def receive_files(socket: s.socket, args: dict):
+    file_count = receive_file_count(socket)
+
+    for _ in range(file_count):
+        socket.listen(5)
+        client_socket, address = socket.accept()
+
+        file, filesize, md5, modtime = receive_file_info(client_socket)
+
+        # casting
+        try:
+            file = Path(file)
+            filesize = int(filesize)
+            # md5 is a string already
+            modtime = float(modtime)
+            print(f"[i] Received file info: {file}, {filesize}, {md5}, {modtime}")
+        except:
+            print(f"[!] Could not parse received message on receive_files. Aborting")
+            exit(EXIT_FAILURE)
+
+        # deciding what to do with file
+        if  args['update'] == True and update_option_handler(file, md5, modtime) == False or\
+            args['create'] == True and create_option_handler(file) == False or\
+            not file.exists():
+            # none of the options triggered
+            print("[i] Skipping transmition")
+            client_socket.send(f"{SKIP}".encode())
+        else:
+            print("[i] Sending ok")
+            client_socket.send(f"{OK}".encode())
+            receive_file_contents(client_socket, file, filesize)
+
+        print("[i] Closing socket")
+        client_socket.close()
+
+def update_option_handler(file: Path, md5: str, modtime: float) -> bool:
+    ''' Handles the update case.
+        Invoking this function implies args['update'] == True.
+        Return:
+            True - Receive the file
+            False - Skip the file
+    '''
+    ret = True
+    if file.exists():
+        # we can skip if our file is the same or older
+            if gen.calculate_md5(file) == md5 or os.stat(file).st_mtime < modtime:
+                ret = False
+    return ret
+
+def create_option_handler(file: Path) -> bool:
+    ''' Handles the create case.
+        Invoking this function implies args['create'] == True '''
+    ret = True
+    if not file.exists():
+        if not file.parents[0].exists():
+            os.makedirs(file.parents[0])
+        file.touch()
+        ret = True
+        print(f"[i] New file {file} created")
+
+    return ret
+
+def receive_file_count(socket: s.socket):
+    ''' Receives file count and sends ok back. '''
+
+    socket.listen(5)
+    client_socket, address = socket.accept()
+
+    file_count = 0
+
+    try:
+        file_count = int(client_socket.recv(BUFFER_SIZE).decode())
+        print(f"[i] Receiving {file_count} files")
+        client_socket.send(f"{OK}".encode())
+        print("[i] Sending ok")
+    except:
+        raise
+
+    return file_count
 
 
-def receive_file(socket, destination=None):
-    ''' Receives and stores the file, no questions asked. '''
-    filename, filesize, md5, modtime = receive_file_info(socket)
-
-    if not destination == None:
-        filename = Path(destination + '/' + filename)
-
-    socket.send(f"{OK}".encode())
-
-    path = Path(filename)
-    receive_file_contents(socket, path, filesize)
-
-
-def receive_file_info(socket):
+def receive_file_info(socket: s.socket):
     ''' Function to receive the file informations.'''
     # receive the file infos
     received = socket.recv(BUFFER_SIZE).decode()
     return received.split(SEPARATOR)
 
 
-def receive_file_contents(socket, path, filesize):
+def receive_file_contents(socket: s.socket, path: Path, filesize: int):
     # type casting
     filename = Path(path)
     filesize = int(filesize)
@@ -156,3 +175,4 @@ def receive_file_contents(socket, path, filesize):
             f.write(bytes_read)
             # update the progress bar
             progress.update(len(bytes_read))
+
