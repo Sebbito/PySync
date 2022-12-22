@@ -8,6 +8,11 @@ import receiver
 # whenever you see constants, they are from here
 from constants import *
 
+def get(args):
+    exit('not implemented')
+
+def sync(args):
+    exit('not implemented')
 
 def send(args):
     '''
@@ -29,7 +34,7 @@ def send(args):
         loop_through_and_send(DEFAULT_SERVER, DEFAULT_PORT, list)
 
         print("[+] Closed socket")
-    except Exception as e:
+    except Exception:
         print(f"[!] Fatal error while transmitting. Aborting.")
         raise
 
@@ -52,13 +57,13 @@ def initiate_communication(address, port, args):
             print(f"[!] Invalid server response '{rec}'. Aborting")
             exit(EXIT_FAILURE)
 
-        print(f"[i] Received ok. Start sending files.")
+        print(f"[i] Received ok")
         # close the socket
         socket.close()
     except ConnectionRefusedError:
         print("[!] Server not found or connection closed.")
-        socket.close()
         exit(EXIT_FAILURE)
+
 
 def send_file_count(address, port, file_count):
     if file_count is None:
@@ -120,7 +125,7 @@ def send_file(socket, file):
         print("[+] Received ok, continuing.")
         send_file_contents(socket, file)
     elif received == SKIP:
-        print("[i] Received skip, file contents are the same, continuing")
+        print("[i] Received skip, continuing")
     else:
         print("[!] No or illegal status signal received. Aborting file transmission")
         exit(EXIT_FAILURE)
