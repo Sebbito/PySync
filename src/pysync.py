@@ -21,17 +21,14 @@ def receive(args):
     exit(EXIT_SUCCESS)
 
 def send(args):
-    # s = sender.Sender(update=args.update)
     s.send(args)
     exit(EXIT_SUCCESS)
 
 def get(args):
-    # s = sender.Sender(update=args.update)
     s.get(args)
     exit(EXIT_SUCCESS)
 
 def sync(args):
-    # s = sender.Sender(update=args.update)
     s.sync(args)
     exit(EXIT_SUCCESS)
 
@@ -48,15 +45,16 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(help="pysync {command} --help")
 
     # Syncing
-    parser_send = subparsers.add_parser("sync", aliases=["sy"], help="Synchronizes all files. Similar to send and get with -uc options.")
-    parser_send.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
-    parser_send.set_defaults(func=send)
+    parser_sync = subparsers.add_parser("sync", aliases=["sy"], help="Synchronizes all files. Similar to send and get with -uc options.")
+    parser_sync.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
+    parser_sync.set_defaults(func=sync)
 
     # Getting
-    parser_send = subparsers.add_parser("get", aliases=["ge"], help="Pulls all files from server. Overwrites local files with the same name on default.")
-    parser_send.add_argument("-u", "--update", action="store_true", help="Update local files. Older remote files are skipped.")
-    parser_send.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
-    parser_send.set_defaults(func=send)
+    parser_get = subparsers.add_parser("get", aliases=["ge"], help="Pulls all files from server. Overwrites local files with the same name on default.")
+    parser_get.add_argument("file", nargs="+", help="Files to be sent by the server.")
+    parser_get.add_argument("-u", "--update", action="store_true", help="Update local files. Older remote files are skipped.")
+    parser_get.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
+    parser_get.set_defaults(func=get)
 
     # Sending
     parser_send = subparsers.add_parser("send", aliases=["se"], help="Sends files from the given directory to the server. Overwrites local files with the same name on default.")

@@ -9,44 +9,54 @@ import receiver
 from constants import *
 
 def get(args):
-    exit('not implemented')
+    print(f"[i] Called routine to get files")
+
+    server_socket = receiver.get_binded_socket(DEFAULT_SERVER)
+    args['port'] = server_socket.getsockname()[1]
+    
+    # send the first message of the communication
+    initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
+
+    receiver.receive(server_socket)
 
 def sync(args):
     exit('not implemented')
 
-def send(args):
+def send(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
     '''
     Function to send one or more files to a server.
     args:
         - file
         - options for operation
     '''
+    print(f"[i] Called routine to send files")
+
+    if hasattr(args, 'func'):
+        # remove the file list
+        args.pop('file')
+
     try:
         list, count = gen.get_file_list_and_count(args['file'])
 
         # send the first message of the communication
-        initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
+        initiate_communication(address, port, args)
 
         # send filecount 
-        send_file_count(DEFAULT_SERVER, DEFAULT_PORT, count)
+        send_file_count(address, port, count)
 
         # send all the files in the file list
-        loop_through_and_send(DEFAULT_SERVER, DEFAULT_PORT, list)
-
-        print("[+] Closed socket")
-    except Exception:
+        loop_through_and_send(address, port, list)
+    except:
         print(f"[!] Fatal error while transmitting. Aborting.")
         raise
 
 
-def initiate_communication(address, port, args):
+def initiate_communication(address=DEFAULT_SERVER, port=DEFAULT_PORT, args=None):
     ''' Sends the arguments over to the server to set it up for transmition. '''
     try:
-        # remove the file list
-        args.pop('file')
 
         socket = s.socket()
-        print(f"[i] Connecting to server {DEFAULT_SERVER}:{DEFAULT_PORT}.")
+        print(f"[i] Connecting to server {address}:{port}.")
         socket.connect((address, port))
         print("[+] Connected to server.")
         socket.send(f"{args}".encode())
@@ -73,7 +83,7 @@ def send_file_count(address, port, file_count):
     socket = s.socket()
     socket.connect((address, port))
     
-    print(f"[i] Sending filecount")
+    print(f"[i] Sending filecount '{file_count}' to ({address}, {port})")
     socket.send(f"{file_count}".encode())
 
     rec = socket.recv(BUFFER_SIZE).decode()
