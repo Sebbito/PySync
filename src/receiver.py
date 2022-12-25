@@ -10,48 +10,57 @@ from constants import *
 
 
 def receive_forever(args):
-    socket = s.socket(s.AF_INET, s.SOCK_STREAM)
-    socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
-    socket.bind((DEFAULT_SERVER, DEFAULT_PORT))
+    server_socket = get_binded_socket(DEFAULT_SERVER)
 
     try:
         while(True):
-            receive(socket)
+            receive(server_socket)
     except KeyboardInterrupt:
-        socket.close()
+        server_socket.close()
         print(f"[!] Aborted receiving")
     
 
 def receive_once(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
-    socket = s.socket(s.AF_INET, s.SOCK_STREAM)
-    socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
-    socket.bind((address, port))
+    server_socket = get_binded_socket(DEFAULT_SERVER)
 
     try:
-        receive(socket)
+        receive(server_socket)
     except KeyboardInterrupt:
-        socket.close()
         print(f"[!] Aborted receiving")
+        server_socket.close()
+        print(f"[i] Closed Socket")
 
-def receive(socket):
-    args, address = receive_msg_start(socket)
+def receive(server_socket: s.socket):
+    args, address = receive_msg_start(server_socket)
 
     # start according routine
     if args['func'] == 'send':
-        receive_files(socket, args)
+        # client wants to send files to us
+        receive_files(server_socket, args)
     elif args['func'] == 'get':
+        # client wants us to send files to him
         try:
             list, count = gen.get_file_list_and_count(args['file'])
+
+            # IMPORTANT: change the function or else we enter an endless loop
+            args['func'] = 'send'
+            port = args.pop('port')
+
+            # send the first message of the communication
+            sender.initiate_communication(address[0], port, args)
             # send filecount 
-            sender.send_file_count(address, DEFAULT_PORT, count)
+            # address is a tuple (ip, port) but we don't want to use the socket
+            # with which the caller initiated, since he will open a server
+            # on his side on another port
+            sender.send_file_count(address[0], port, count)
 
             # send all the files in the file list
-            sender.loop_through_and_send(address, DEFAULT_PORT, list)
+            sender.loop_through_and_send(address[0], port, list)
 
             print("[+] Closed socket")
         except:
             print(f"[!] Fatal error while transmitting. Aborting.")
-        raise
+            raise
     # elif args['func'] is 'sync':
     #     receive_files(args, socket)
     #     sender.send(args)
@@ -67,7 +76,7 @@ def receive_msg_start(socket):
 
     try:
         received = eval(client_socket.recv(BUFFER_SIZE).decode())
-        print(f"[i] Received {received}")
+        print(f"[i] Received {received} from {address}")
         client_socket.send(f"{OK}".encode())
         print("[i] Sending ok")
     except SyntaxError:
@@ -147,6 +156,8 @@ def receive_file_count(socket: s.socket):
     socket.listen(5)
     client_socket, address = socket.accept()
 
+    print(f"[i] Client {address} connected")
+
     file_count = 0
 
     try:
@@ -188,3 +199,22 @@ def receive_file_contents(socket: s.socket, path: Path, filesize: int):
             # update the progress bar
             progress.update(len(bytes_read))
 
+def get_binded_socket(address: str):
+    ''' Will open a socket and bind it to a free port. 
+        Loops from the default until it finds a free one.'''
+    socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+    socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
+    port = int(DEFAULT_PORT)
+
+    while(True):
+        try:
+            socket.bind((address, port))
+            break
+        except:
+            port += 1
+            continue
+
+    opts = socket.getsockname()
+    print(f"[i] Opened up server at {opts}")
+
+    return socket

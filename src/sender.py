@@ -9,10 +9,15 @@ import receiver
 from constants import *
 
 def get(args):
+    print(f"[i] Called routine to get files")
+
+    server_socket = receiver.get_binded_socket(DEFAULT_SERVER)
+    args['port'] = server_socket.getsockname()[1]
+    
     # send the first message of the communication
     initiate_communication(DEFAULT_SERVER, DEFAULT_PORT, args)
 
-    receiver.receive_once(args)
+    receiver.receive(server_socket)
 
 def sync(args):
     exit('not implemented')
@@ -24,6 +29,8 @@ def send(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
         - file
         - options for operation
     '''
+    print(f"[i] Called routine to send files")
+
     if hasattr(args, 'func'):
         # remove the file list
         args.pop('file')
@@ -44,12 +51,12 @@ def send(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
         raise
 
 
-def initiate_communication(address, port, args):
+def initiate_communication(address=DEFAULT_SERVER, port=DEFAULT_PORT, args=None):
     ''' Sends the arguments over to the server to set it up for transmition. '''
     try:
 
         socket = s.socket()
-        print(f"[i] Connecting to server {DEFAULT_SERVER}:{DEFAULT_PORT}.")
+        print(f"[i] Connecting to server {address}:{port}.")
         socket.connect((address, port))
         print("[+] Connected to server.")
         socket.send(f"{args}".encode())
@@ -76,7 +83,7 @@ def send_file_count(address, port, file_count):
     socket = s.socket()
     socket.connect((address, port))
     
-    print(f"[i] Sending filecount")
+    print(f"[i] Sending filecount '{file_count}' to ({address}, {port})")
     socket.send(f"{file_count}".encode())
 
     rec = socket.recv(BUFFER_SIZE).decode()
