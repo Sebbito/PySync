@@ -31,47 +31,25 @@ def receive_once(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
         print(f"[i] Closed Socket")
 
 def receive(server_socket: s.socket):
-    args, address = receive_msg_start(server_socket)
+    args, address, client_socket = receive_msg_start(server_socket)
 
     # start according routine
     if args['func'] == 'send':
         # client wants to send files to us
-        receive_files(server_socket, args)
+        receive_files(client_socket, args)
     elif args['func'] == 'get':
-        # client wants us to send files to him
-        try:
-            list, count = gen.get_file_list_and_count(args['file'])
-
-            # IMPORTANT: change the function or else we enter an endless loop
-            args['func'] = 'send'
-            port = args.pop('port')
-
-            # send the first message of the communication
-            sender.initiate_communication(address[0], port, args)
-            # send filecount 
-            # address is a tuple (ip, port) but we don't want to use the socket
-            # with which the caller initiated, since he will open a server
-            # on his side on another port
-            sender.send_file_count(address[0], port, count)
-
-            # send all the files in the file list
-            sender.loop_through_and_send(address[0], port, list)
-
-            print("[+] Closed socket")
-        except:
-            print(f"[!] Fatal error while transmitting. Aborting.")
-            raise
-    # elif args['func'] is 'sync':
-    #     receive_files(args, socket)
-    #     sender.send(args)
+        # IMPORTANT: change the function or else we enter an endless loop
+        args['func'] = 'send'
+        sender.send(args)
     else:
         print(f"[!] Illegal option {args['func']}. Aborting")
         exit(EXIT_FAILURE)
+    client_socket.close()
 
 
-def receive_msg_start(socket):
+def receive_msg_start(socket: s.socket):
     ''' Function to receive the starting information of the transmition.'''
-    socket.listen(5)
+    socket.listen(1)
     client_socket, address = socket.accept()
 
     try:
@@ -82,31 +60,14 @@ def receive_msg_start(socket):
     except SyntaxError:
         print(f"[!] Could not parse received message. Aborting")
         exit(EXIT_FAILURE)
-    finally:
-        client_socket.close()
-        print("[i] Closing socket")
 
-    return received, address
+    return received, address, client_socket
 
 def receive_files(socket: s.socket, args: dict):
     file_count = receive_file_count(socket)
 
     for _ in range(file_count):
-        socket.listen(5)
-        client_socket, address = socket.accept()
-
-        file, filesize, md5, modtime = receive_file_info(client_socket)
-
-        # casting
-        try:
-            file = Path(file)
-            filesize = int(filesize)
-            # md5 is a string already
-            modtime = float(modtime)
-            print(f"[i] Received file info: {file}, {filesize}, {md5}, {modtime}")
-        except:
-            print(f"[!] Could not parse received message on receive_files. Aborting")
-            exit(EXIT_FAILURE)
+        file, filesize, md5, modtime = receive_file_info(socket)
 
         # deciding what to do with file
         if  args['update'] == True and update_option_handler(file, md5, modtime) == False or\
@@ -114,14 +75,14 @@ def receive_files(socket: s.socket, args: dict):
             not file.exists():
             # none of the options triggered
             print("[i] Skipping transmition")
-            client_socket.send(f"{SKIP}".encode())
+            socket.send(f"{SKIP}".encode())
         else:
             print("[i] Sending ok")
-            client_socket.send(f"{OK}".encode())
-            receive_file_contents(client_socket, file, filesize)
+            socket.send(f"{OK}".encode())
+            receive_file_contents(socket, file, filesize)
+            print("[i] Done receiving, sending ok")
+            socket.send(f"{OK}".encode())
 
-        print("[i] Closing socket")
-        client_socket.close()
 
 def update_option_handler(file: Path, md5: str, modtime: float) -> bool:
     ''' Handles the update case.
@@ -135,6 +96,7 @@ def update_option_handler(file: Path, md5: str, modtime: float) -> bool:
         # we can skip if our file is the same or older
             if gen.calculate_md5(file) == md5 or os.stat(file).st_mtime < modtime:
                 ret = False
+                print("[i] Update true but out file is newer, skipping")
     return ret
 
 def create_option_handler(file: Path) -> bool:
@@ -152,18 +114,12 @@ def create_option_handler(file: Path) -> bool:
 
 def receive_file_count(socket: s.socket):
     ''' Receives file count and sends ok back. '''
-
-    socket.listen(5)
-    client_socket, address = socket.accept()
-
-    print(f"[i] Client {address} connected")
-
     file_count = 0
 
     try:
-        file_count = int(client_socket.recv(BUFFER_SIZE).decode())
+        file_count = int(socket.recv(BUFFER_SIZE).decode())
         print(f"[i] Receiving {file_count} files")
-        client_socket.send(f"{OK}".encode())
+        socket.send(f"{OK}".encode())
         print("[i] Sending ok")
     except:
         raise
@@ -175,29 +131,39 @@ def receive_file_info(socket: s.socket):
     ''' Function to receive the file informations.'''
     # receive the file infos
     received = socket.recv(BUFFER_SIZE).decode()
-    return received.split(SEPARATOR)
+    file, filesize, md5, modtime = received.split(SEPARATOR)
+
+    # casting
+    try:
+        file = Path(file)
+        filesize = int(filesize)
+        # md5 is a string already
+        modtime = float(modtime)
+        print(f"[i] Received file info: {file}, {filesize}, {md5}, {modtime}")
+    except:
+        print(f"[!] Could not parse received message on receive_files. Aborting")
+        exit(EXIT_FAILURE)
+    return file, filesize, md5, modtime
 
 
-def receive_file_contents(socket: s.socket, path: Path, filesize: int):
-    # type casting
-    filename = Path(path)
-    filesize = int(filesize)
-
+def receive_file_contents(socket: s.socket, filename: Path, filesize: int):
     # start receiving the file from the socket
     # and writing to the file stream
     progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
     with open(filename, "wb") as f:
-        while True:
+        bytes_received = 0
+        while bytes_received < filesize:
             # read 1024 bytes from the socket (receive)
             bytes_read = socket.recv(BUFFER_SIZE)
-            if not bytes_read:    
-                # nothing is received
-                # file transmitting is done
-                break
+            if bytes_read == b'':
+                raise RuntimeError("socket connection broken")
             # write to the file the bytes we just received
             f.write(bytes_read)
             # update the progress bar
             progress.update(len(bytes_read))
+            bytes_received = bytes_received + len(bytes_read)
+
+
 
 def get_binded_socket(address: str):
     ''' Will open a socket and bind it to a free port. 
