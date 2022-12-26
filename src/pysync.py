@@ -46,7 +46,10 @@ if __name__ == "__main__":
 
     # Syncing
     parser_sync = subparsers.add_parser("sync", aliases=["sy"], help="Synchronizes all files. Similar to send and get with -uc options.")
+    parser_sync.add_argument("file", nargs="+", help="Files to be sent by the server.")
     parser_sync.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
+    parser_sync.add_argument("--address", help="Address of the server.")
+    parser_sync.add_argument("--port", help="Port of the server.")
     parser_sync.set_defaults(func=sync)
 
     # Getting
@@ -54,6 +57,8 @@ if __name__ == "__main__":
     parser_get.add_argument("file", nargs="+", help="Files to be sent by the server.")
     parser_get.add_argument("-u", "--update", action="store_true", help="Update local files. Older remote files are skipped.")
     parser_get.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
+    parser_get.add_argument("--address", help="Address of the server.")
+    parser_get.add_argument("--port", help="Port of the server.")
     parser_get.set_defaults(func=get)
 
     # Sending
@@ -61,6 +66,8 @@ if __name__ == "__main__":
     parser_send.add_argument("file", nargs="+", help="Files to be sent.")
     parser_send.add_argument("-u", "--update", action="store_true", help="Update remote files. Older local files are skipped.")
     parser_send.add_argument("-c", "--create", action="store_true", help="Create non-existant files and directories.")
+    parser_send.add_argument("--address", help="Address of the server.")
+    parser_send.add_argument("--port", help="Port of the server.")
     parser_send.set_defaults(func=send)
 
     # Receiving 
