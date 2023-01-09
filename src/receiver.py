@@ -5,9 +5,11 @@ from pathlib import Path
 import socket as s
 import generator as gen
 import sender
+import logging
 # whenever you see constants, they are from here
 from constants import *
 
+log = logging.getLogger(LOGGER_NAME)
 
 def receive_forever(args):
     server_socket = get_binded_socket(DEFAULT_SERVER)
@@ -15,9 +17,10 @@ def receive_forever(args):
     try:
         while(True):
             receive(server_socket)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         server_socket.close()
-        print(f"[!] Aborted receiving")
+        log.warning(e)
+        raise e
     
 
 def receive_once(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
@@ -25,10 +28,10 @@ def receive_once(args, address=DEFAULT_SERVER, port=DEFAULT_PORT):
 
     try:
         receive(server_socket)
-    except KeyboardInterrupt:
-        print(f"[!] Aborted receiving")
+    except KeyboardInterrupt as e:
         server_socket.close()
-        print(f"[i] Closed Socket")
+        log.warning(e)
+        raise e
 
 def receive(server_socket: s.socket):
     args, address, client_socket = receive_msg_start(server_socket)
@@ -42,8 +45,9 @@ def receive(server_socket: s.socket):
         args['func'] = 'send'
         sender.send(args)
     else:
-        print(f"[!] Illegal option {args['func']}. Aborting")
-        exit(EXIT_FAILURE)
+        e = RuntimeError(f"[!] Illegal option {args['func']}. Aborting")
+        log.error(e)
+        raise e
     client_socket.close()
 
 
@@ -54,17 +58,18 @@ def receive_msg_start(socket: s.socket):
 
     try:
         received = eval(client_socket.recv(BUFFER_SIZE).decode())
-        print(f"[i] Received {received} from {address}")
+        log.debug(f"[i] Received {received} from {address}")
         client_socket.send(f"{OK}".encode())
-        print("[i] Sending ok")
-    except SyntaxError:
-        print(f"[!] Could not parse received message. Aborting")
-        exit(EXIT_FAILURE)
+        log.debug("[i] Sending ok")
+    except Exception as e:
+        log.error(e)
+        raise e
 
     return received, address, client_socket
 
 def receive_files(socket: s.socket, args: dict):
     file_count = receive_file_count(socket)
+    progress = tqdm.tqdm(range(file_count), f"Receiving {file_count} files")
 
     for _ in range(file_count):
         file, filesize, md5, modtime = receive_file_info(socket)
@@ -74,14 +79,17 @@ def receive_files(socket: s.socket, args: dict):
             args['create'] == True and create_option_handler(file) == False or\
             not file.exists():
             # none of the options triggered
-            print("[i] Skipping transmition")
+            log.debug("[i] Skipping transmition")
             socket.send(f"{SKIP}".encode())
         else:
-            print("[i] Sending ok")
+            log.debug("[i] Sending ok")
             socket.send(f"{OK}".encode())
             receive_file_contents(socket, file, filesize)
-            print("[i] Done receiving, sending ok")
+            log.debug("[i] Done receiving, sending ok")
             socket.send(f"{OK}".encode())
+
+        # update the progress bar
+        progress.update(1)
 
 
 def update_option_handler(file: Path, md5: str, modtime: float) -> bool:
@@ -96,7 +104,7 @@ def update_option_handler(file: Path, md5: str, modtime: float) -> bool:
         # we can skip if our file is the same or older
             if gen.calculate_md5(file) == md5 or os.stat(file).st_mtime < modtime:
                 ret = False
-                print("[i] Update true but out file is newer, skipping")
+                log.debug("Update true but out file is newer, skipping")
     return ret
 
 def create_option_handler(file: Path) -> bool:
@@ -108,7 +116,7 @@ def create_option_handler(file: Path) -> bool:
             os.makedirs(file.parents[0])
         file.touch()
         ret = True
-        print(f"[i] New file {file} created")
+        log.debug(f"New file {file} created")
 
     return ret
 
@@ -118,11 +126,12 @@ def receive_file_count(socket: s.socket):
 
     try:
         file_count = int(socket.recv(BUFFER_SIZE).decode())
-        print(f"[i] Receiving {file_count} files")
+        log.debug(f"Receiving {file_count} files")
         socket.send(f"{OK}".encode())
-        print("[i] Sending ok")
-    except:
-        raise
+        log.debug("Sending ok")
+    except Exception as e:
+        log.error(e)
+        raise e
 
     return file_count
 
@@ -139,17 +148,16 @@ def receive_file_info(socket: s.socket):
         filesize = int(filesize)
         # md5 is a string already
         modtime = float(modtime)
-        print(f"[i] Received file info: {file}, {filesize}, {md5}, {modtime}")
-    except:
-        print(f"[!] Could not parse received message on receive_files. Aborting")
-        exit(EXIT_FAILURE)
+        log.debug(f"[i] Received file info: {file}, {filesize}, {md5}, {modtime}")
+    except Exception as e:
+        log.error(e)
+        raise e
     return file, filesize, md5, modtime
 
 
 def receive_file_contents(socket: s.socket, filename: Path, filesize: int):
     # start receiving the file from the socket
     # and writing to the file stream
-    progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
     with open(filename, "wb") as f:
         bytes_received = 0
         while bytes_received < filesize:
@@ -159,8 +167,6 @@ def receive_file_contents(socket: s.socket, filename: Path, filesize: int):
                 raise RuntimeError("socket connection broken")
             # write to the file the bytes we just received
             f.write(bytes_read)
-            # update the progress bar
-            progress.update(len(bytes_read))
             bytes_received = bytes_received + len(bytes_read)
 
 
@@ -181,6 +187,6 @@ def get_binded_socket(address: str):
             continue
 
     opts = socket.getsockname()
-    print(f"[i] Opened up server at {opts}")
+    log.info(f"Opened up server at {opts}")
 
     return socket

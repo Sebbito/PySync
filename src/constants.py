@@ -1,5 +1,9 @@
 #!/bin/python3
 
+PYSYNC_LOG_FILE = "~/.pysync/pysync.log"
+PYSYNC_CONF_FILE = "~/.pysync/pysync.conf"
+LOGGER_NAME = "pysync_logger"
+
 # defaults
 DEFAULT_PORT = 40500
 DEFAULT_SERVER = "127.0.0.1"
