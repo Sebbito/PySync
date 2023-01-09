@@ -1,13 +1,13 @@
 #!/bin/python3
-# This file implements functions and ressources for the client side of pysync
+import os
+from pathlib import Path
 import argparse as ap
+import logging
 import receiver as r
 import sender as s
 from constants import *
 
 VERSION="0.0.1"
-
-# CONF_PATH = "~/.config/pysync/client"
 
 def receive(args):
 
@@ -32,11 +32,45 @@ def sync(args):
     s.sync(args)
     exit(EXIT_SUCCESS)
 
-if __name__ == "__main__":
+def init_logger():
+    log_path = Path(PYSYNC_LOG_FILE).expanduser()
+
+    if log_path.is_file():
+        pass
+    elif not log_path.exists():
+        try:
+            os.makedirs(log_path.parents[0])
+            log_path.touch()
+        except FileExistsError:
+            pass
+        except Exception as e:
+            raise e
+        pass
+    else:
+        print(f"Log file doesn't exist, isn't readble or could not be created. Please make sure that the log file ({log_path}) is a regular file and read/writable")
+        exit()
+
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+    file_handler = logging.FileHandler(log_path, mode='w', encoding='utf-8')
+    stream_handler = logging.StreamHandler()
+
+
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+
+    stream_handler.setFormatter(formatter)
+    stream_handler.setLevel(logging.INFO)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
+def init_argparse():
     parser = ap.ArgumentParser(
-            prog="pysync",
-            description="Program for file synchronization with another machine running PySync."
-            )
+        prog="pysync",
+        description="Program for file synchronization with another machine running PySync."
+        )
 
     parser.add_argument("-v", "--version", action="version", version="%(prog)s {}".format(VERSION) )
     # parser.add_argument("-l", "--list", action=filehelper.list_files(), help="Lists all files that are tracked for syncing.")
@@ -77,13 +111,27 @@ if __name__ == "__main__":
     parser_receive.add_argument("-d", "--destination", help="Chose a different directory for file storage.")
     parser_receive.set_defaults(func=receive)
 
+    return parser
+
+
+if __name__ == "__main__":
+    parser = init_argparse()
+    init_logger()
     args = parser.parse_args()
+
+    log = logging.getLogger(LOGGER_NAME)
+
+    log.debug(f"Started with args {args}")
 
     if hasattr(args, "func"):
         func = args.func
         options = vars(args).copy()
-        options["func"] =  options["func"].__name__# this is not needed for any process
-        print(f"{options}")
-        args.func(options)
+        options["func"] =  options["func"].__name__ # transform function to prettier name
+        try:
+            args.func(options)
+        except Exception as e:
+            print(e)
     else:
         parser.print_help()
+
+    log.debug(f"Closing program")

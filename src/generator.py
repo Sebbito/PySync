@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 import hashlib
+import logging
 from pathlib import Path
 from constants import *
+
+log = logging.getLogger(LOGGER_NAME)
 
 def generate_file_list(mixed):
     ''' Generates a list of path objects from the mixed object.
@@ -9,8 +12,9 @@ def generate_file_list(mixed):
         Will return a list of all files found'''
     
     if mixed == None:
-        print("[!] File list is empty. Aborting")
-        exit()
+        e = RuntimeError("File list is empty")
+        log.error(e)
+        raise e
     
     file_list = []
 
@@ -23,7 +27,7 @@ def get_file_list_and_count(files):
     file_list = generate_file_list(files)
     file_count = len(file_list)
 
-    print(f"[i] Found {file_count} files.")
+    log.debug(f"[i] Found {file_count} files.")
     return file_list, file_count
 
 
@@ -38,11 +42,12 @@ def fetch_files(path, list):
         elif p.is_file():
             list.append(p)
         else:
-            print("[!] Path {p} is not viable. Aborting")
+            log.debug("[!] Path {p} is not viable. Aborting")
             exit(EXIT_FAILURE)
     else:
-        print("[!] Path {p} is not viable. Aborting")
-        exit(EXIT_FAILURE)
+        e = RuntimeError("Path {p} is not viable. Aborting")
+        log.error(e)
+        raise e
 
 def calculate_md5(file):
     ''' Calculates the md5 sum for the file. '''
